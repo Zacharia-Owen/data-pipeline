@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "tsx src/pipeline.ts",
+    "build": "tsc",
+    "start": "node dist/pipeline.js"
   },
   "repository": {
     "type": "git",
@@ -29,7 +32,7 @@
     "@types/node": "^26.1.2",
     "@types/pg": "^8.20.4",
     "nodemon": "^3.1.14",
-    "ts-node": "^10.9.2",
+    "tsx": "^4.23.5",
     "typescript": "^7.0.2"
   }
 }
