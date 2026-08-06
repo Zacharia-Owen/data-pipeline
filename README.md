@@ -39,11 +39,11 @@ data-pipeline/
 
 The pipeline runs in three sequential steps:
 
-**Extract** — Axios fetches raw HTML from books.toscrape.com page by page, with a 1 second delay between requests to avoid overloading the server. Cheerio parses each page and extracts raw book data as strings.
+**Extract** — Axios fetches raw HTML from books.toscrape.com, page by page across the full 50-page catalogue, with a 1 second delay between requests to avoid overloading the server. If a page fails to load or returns no books, the scraper logs it and stops early rather than continuing to hit pages that don't exist. Cheerio parses each page and extracts raw book data as strings.
 
 **Transform** — The cleaner converts raw strings into properly typed records. Prices have currency symbols stripped and are parsed to decimals. Star ratings are converted from CSS class names to integers. Availability strings become booleans. Books that fail validation (zero price, zero rating, empty title) are filtered out entirely rather than stored as bad data.
 
-**Load** — All inserts are wrapped in a single PostgreSQL transaction. If any insert fails, the entire load rolls back so the database is never left in a partially loaded state. Existing data is cleared before each run to ensure the database always reflects the most recent scrape.
+**Load** — Each book is inserted or, if it already exists (matched by its unique URL), updated with the latest scraped data — all wrapped in a single PostgreSQL transaction. If any write fails, the entire load rolls back so the database is never left in a partially loaded state.
 
 ## Getting Started
 
@@ -113,7 +113,9 @@ The API runs on `http://localhost:4000`.
 
 **Transactional loading:** All inserts are wrapped in a single PostgreSQL transaction. If any insert fails mid-load, the entire operation rolls back. The database is never left in a partially loaded state.
 
-**Truncate and reload:** On each pipeline run, existing data is cleared before fresh data is loaded. This guarantees the database always reflects the most recent scrape rather than accumulating stale or duplicate records.
+**Upsert instead of truncate-and-reload:** Each run inserts new books and updates existing ones (matched by URL) rather than clearing the table first. This avoids unnecessarily rewriting unchanged rows and lays the groundwork for incremental, scheduled runs. Trade-off: a book that's removed from the source site will still remain in the database rather than being cleaned up automatically — see Future Improvements.
+
+**Resilient scraping:** Requests that fail (network errors, bad responses) are caught and logged rather than crashing the whole pipeline; that page is simply treated as empty and the run continues.
 
 **Parameterized queries:** All database queries use parameterized placeholders to prevent SQL injection, including dynamically constructed filter queries in the API.
 
@@ -123,15 +125,15 @@ The API runs on `http://localhost:4000`.
 
 ## Known Limitations
 
-- Pipeline currently scrapes 3 pages (60 books) rather than the full 50 pages
-- No incremental loading — each run clears and reloads all data
+- No category data yet — the source site only exposes category on each book's individual detail page, not the listing page, so this would require a second request per book (~1000 extra
+requests, ~17 extra minutes with the current polite delay)
+- Books removed from the source site are never removed from the database (no soft-delete or cleanup logic yet)
 - No scheduled execution — the pipeline must be run manually
 
 ## Future Improvements
 
-- [ ] Scrape all 50 pages for a complete dataset
-- [ ] Add book category data to the schema
-- [ ] Implement incremental loading with upsert to avoid full reloads
 - [ ] Schedule pipeline runs automatically with a cron job
 - [ ] Deploy API to Render and dashboard to Vercel
 - [ ] Add data quality reporting to log rejected records and reasons
+- [ ] Add book category data to the schema (requires per-book detail page requests)
+- [ ] Soft-delete books that no longer appear in a scrape, instead of leaving stale rows indefinitely
