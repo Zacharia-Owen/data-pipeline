@@ -8,7 +8,7 @@ const run = async () => {
 
     // Extracting raw data
     console.log('Scraping raw book data...');
-    const rawBooks = await scrapeBooks(3);
+    const rawBooks = await scrapeBooks(50);
     console.log('');
 
     // Cleaning the data

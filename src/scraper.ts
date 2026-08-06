@@ -16,7 +16,17 @@ const scrapeOnePage = async (pageNumber: number): Promise<RawBook[]> => {
     ? 'http://books.toscrape.com/catalogue/page-1.html'
     : `${BASE_URL}/page-${pageNumber}.html`;
 
-    const response = await axios.get(url);
+    let response;
+    try {
+        response = await axios.get(url);
+    } catch (error) {
+        if (axios.isAxiosError(error)) {
+            console.error(`Failed to fetch page ${pageNumber} (${url}): ${error.message}`)
+        } else {
+            console.error(`Failed to fetch page ${pageNumber} (${url}): ${error}`)
+        }
+        return [];
+    }
     const $ = cheerio.load(response.data);
     const books: RawBook[] = [];
 
@@ -45,6 +55,12 @@ export const scrapeBooks = async (pages: number): Promise<RawBook[]> => {
     for (let i = 1; i <= pages; i++) {
         console.log(`Scraping page ${i}...`);
         const books = await scrapeOnePage(i);
+
+        if (books.length === 0) {
+            console.log(`No books found on page ${i}. Stopping the scraping process.`);
+            break;
+        }
+
         allBooks.push(...books);
 
         await new Promise(resolve => setTimeout(resolve, 1000)); // Delay to avoid overwhelming the server
